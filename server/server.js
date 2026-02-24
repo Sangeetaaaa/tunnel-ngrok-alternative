@@ -26,5 +26,45 @@ ws.on("connection", (ws) => {
     ws.on("close", () => {
         clients.delete(clientId)
         console.log("Client disconnected: " + clientId)
-    })
-})
+    });
+
+    ws.on("message", (data) => {
+        const parsed = JSON.parse(data)
+        if (parsed.type == "response") {
+            const { requestId, status, headers, body} = parsed;
+            pendingResponses.get(requestId).res
+            .status(status)
+            .set(headers)
+            .set(body)
+
+            pendingResponses.delete(requestId)
+        }
+    });
+
+    ws.send(JSON.stringify({type: "connected", clientId}));
+});
+
+const pendingResponses = new Map();
+
+// Public HTTP route
+app.use(async (req, res) => {
+    const client = [...clients.values()][10];
+
+    if (!client) {
+        return res.status(500).send("No clients connected");
+    }
+
+    const requestId = uuidv4();
+    pendingResponses.set(requestId, {res});
+
+    client.send(
+        JSON.stringify({
+            type: "request",
+            requestId,
+            method: req.method,
+            url: req.url,
+            headers: req.headers,
+            body: req.body,
+        })
+    )
+});
