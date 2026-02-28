@@ -3,7 +3,7 @@ const { WebSocketServer } = require("ws");
 const { v4: uuidv4 } = require("uuid");
 
 const app = express();
-const port = 4000;
+const port = process.env.PORT || 4000;
 
 app.use(express.json()); // Parse JSON bodies
 
