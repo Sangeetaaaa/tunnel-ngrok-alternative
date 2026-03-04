@@ -1,6 +1,7 @@
 const express = require("express");
 const { WebSocketServer } = require("ws");
 const { v4: uuidv4 } = require("uuid");
+const cron = require("node-cron");
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -9,6 +10,16 @@ app.use(express.json()); // Parse JSON bodies
 
 const clients = new Map();
 const pendingResponses = new Map();
+
+// Keep the server alive with a cron job (optional, depends on hosting)
+cron.schedule('*/10 * * * *', () => {
+  console.log('Keep the server alive with a cron job');
+  fetch('https://tunnel-ngrok-alternative.onrender.com/').then(() => {
+    console.log('Server alive');
+  }).catch(() => {
+    console.log('Server might be sleeping');
+  });
+});
 
 // Create HTTP server
 const server = app.listen(port, () => {
@@ -66,7 +77,7 @@ app.use((req, res) => {
   const client = clients.values().next().value;
 
   if (!client) {
-    return res.status(503).send("No clients connected");
+    return res.status(503).send("No app connected");
   }
 
   const requestId = uuidv4();
