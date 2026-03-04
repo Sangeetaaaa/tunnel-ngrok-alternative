@@ -1,51 +1,53 @@
 const WebSocket = require("ws");
 const axios = require("axios");
+const readline = require("readline");
 
-const SERVER_URL = "ws://localhost:4000";
-const LOCAL_APP = "http://localhost:3000";
+const SERVER_URL = "wss://tunnel-ngrok-alternative.onrender.com/";
 
-const ws = new WebSocket(SERVER_URL)
+async function getPort() {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    return new Promise((resolve) => {
+        rl.question("Enter your port: ", (answer) => {
+            rl.close();
+            resolve(answer);
+        });
+    });
+}
 
-ws.on("open", () => {
-    console.log("Connected to tunnel server")
-})
+async function main() {
+    const PORT = await getPort();
+    const LOCAL_URL = `http://localhost:${PORT}`;
+    console.log(`Using port: ${PORT}`);
 
-ws.on("message", async (data) => {
-    const parsed = JSON.parse(data);
+    const ws = new WebSocket(SERVER_URL);
 
-    if (parsed.type == "request") {
-        const {requestId, method, url, headers, body} = parsed;
+    ws.on("open", () => {
+        console.log("Connected to public server.");
+    });
+
+    ws.on("message", async (data) => {
+        const { type, requestId, method, url, headers, body } = JSON.parse(data);
+        if (type !== "request") return;
 
         try {
-            console.log(LOCAL_APP + url);
-            const response = await axios({
-                method,
-                url: LOCAL_APP + url,
-                headers,
-                data: body,
-            });
-
-            ws.send(
-                JSON.stringify({
-                    type: "response", 
-                    requestId,
-                    status: response.status,
-                    headers: response.headers,
-                    body: response.data,
-                })
-            )
+            const response = await axios({ method, url: LOCAL_URL + url, headers, data: body });
+            ws.send(JSON.stringify({
+                type: "response",
+                requestId,
+                status: response.status,
+                headers: response.headers,
+                body: response.data,
+            }));
         } catch (error) {
-            console.log(error.message);
-            ws.send(
-                JSON.stringify({
-                    type:"response",
-                    requestId,
-                    status: error.response ? error.response.status : 500,
-                    headers: error.response ? error.response.headers : {},
-                    body: "Error contacting local app" + error,
-                })
-            )
+            ws.send(JSON.stringify({
+                type: "response",
+                requestId,
+                status: error.response?.status ?? 500,
+                headers: error.response?.headers ?? {},
+                body: "Error contacting local app: " + error.message,
+            }));
         }
+    });
+}
 
-    }
-})
+main();
