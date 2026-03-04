@@ -77,7 +77,8 @@ app.use((req, res) => {
   const client = clients.values().next().value;
 
   if (!client) {
-    return res.status(503).send("No app connected");
+    // return res.status(503).send("No app connected");
+    return res.sendFile(__dirname + "/ui.html")
   }
 
   const requestId = uuidv4();
